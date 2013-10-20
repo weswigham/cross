@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -e
+
+version="0.0.0"
+
+if cd "$CROSS_ROOT" 2>/dev/null; then
+    git_revision="$(git_describe --tags HEAD 2>/dev/null || true)"
+    git_revision="${git_revision#v}"
+fi 
+
+echo "cross ${git_revision:-$version}"

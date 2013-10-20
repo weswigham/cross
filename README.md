@@ -1,4 +1,4 @@
 cross
 =====
 
-Cross-compiler ebvironment management shims and instalation scripts
+Cross-compiler environment management shims and installation scripts
