@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+#
+# cross - a cross compilation toolchain manager and override system
+# Usage: cross <subcommand> [arguments]
+#
 
 set -e
 

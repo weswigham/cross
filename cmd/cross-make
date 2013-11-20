@@ -1,0 +1,186 @@
+#!/usr/bin/lua
+
+string.context = function(str, context)
+    local ret = str
+    for c in str:gmatch("{{.-}}") do
+        if context[c:gsub("[{}]","")] then
+            ret = ret:gsub(c, context[c:gsub("[{}]","")])
+        else
+            ret = ret:gsub(c, "")
+        end
+    end
+    return ret
+end
+
+local source_control = {}
+source_control["git"] = {
+    new = "clone {{url}} .",
+    exists = "pull {{remote}} {{branch}}",
+    specific = "checkout tags/{{version}}"
+}
+source_control["svn"] = {
+    new = "checkout {{url}} .",
+    exists = "update",
+    specific = "checkout {{rooturl}}/tags/{{version}}",
+}
+source_control["hg"] = {
+    new = "clone {{url}} .",
+    exists = "pull {{remote}}",
+    specific = "checkout {{version}}"
+}
+setmetatable(source_control, {__call = function(self, method, path, con)
+    local con = con or {}
+    if self[method] then
+        local shortpath = path:gsub("/trunk/?$", "") --kill ending 'trunk' if it exists (darned subversion)
+        local bnc = ("basename {{path}}"):context{path = shortpath}
+        local filename = assert(io.popen(bnc)):read()
+        local fn = filename:gsub("%..*$", "")
+        local dir = os.getenv("CROSS_ROOT").."/sources/"..fn
+        local okay = io.popen("mkdir "..dir.." 2>&1")
+        local runstr = method.." "
+        if okay and okay:read("*all"):match("mkdir:") then --dir existed
+            runstr = runstr .. self[method].exists
+        else
+            runstr = runstr .. self[method].new
+        end
+        if con.version then
+            runstr = runstr .. " 2>&1;" .. self[method].specific
+        end
+        con.url = path
+        con.rooturl = shortpath
+        con.method = method
+        con.dir = dir
+        con.dirname = fn
+        local cmd = ("cd {{dir}} 2>&1; "..runstr.." 2>&1;"):context(con)
+        print("Running: ", cmd)
+        local res = io.popen(cmd)
+        for l in res:lines() do
+            print(l)
+        end
+        
+        return dir
+    else
+        error("Source control method '"..method.."' not supported.")
+    end
+end})
+
+
+local argt = {...}
+if #argt< 1 then
+    print("You must supply a target to cross make")
+    return 1
+end
+
+local found
+local target
+for file in io.popen("ls ./targets"):lines() do
+    if file==argt[1] then
+        target = file
+        found = io.open("./targets/"..file)
+        break
+    end
+end
+
+if not found then
+    print("Target not found. Available targets:")
+    local prefix = "  "
+    for file in io.popen("ls ./targets"):lines() do
+        print(prefix..file)
+    end
+    
+    return 1
+end
+
+local dependencies = {
+    BINUTILS = {
+        method = "git",
+        url = "git://sourceware.org/git/binutils-gdb.git",
+        builder = "./configure --target={{target}} --prefix={{output}}; make all; make install;"
+    },
+    LIBICONV = {
+        method = "git",
+        url = "git://git.savannah.gnu.org/libiconv.git",
+        builder = "cd ../; mv libiconv gcc/libiconv"
+    },
+    GMP = {
+        method = "hg",
+        url = "http://hg.gmplib.org:8000/gmp-5.1",
+        builder = "cd ../; mv gmp gcc/gmp"
+    },
+    MPFR = {
+        method = "svn",
+        url = "svn://scm.gforge.inria.fr/svn/mpfr/branches/3.1",
+        builder = "cd ../; mv mpfr gcc/mpfr"
+    },
+    MPC = {
+        method = "svn",
+        url = "svn://scm.gforge.inria.fr/svnroot/mpc/trunk",
+        builder = "cd ../; mv mpc gcc/mpc"
+    },
+    GCC = {
+        method = "svn",
+        url = "svn://gcc.gnu.org/svn/gcc/trunk",
+        builder = "make distclean; ./configure --target={{target}} --prefix={{output}} --without-headers \
+        --with-newlib --with-gnu-as --with-gnu-ld; make all; make install;"
+    },
+    LIBC = { --use newlib by default because, well, anything else is hard
+        method = "git",
+        url = "git://sourceware.org/git/newlib.git",
+        builder = "./configure --target={{target}} --prefix={{output}}; make all; make install;"     
+    }
+}
+
+local s = "return { " .. found:read("*a") .. " }"
+found:close()
+local env = assert(loadstring(s))()
+
+local order = {"BINUTILS", "LIBICONV", "GMP", "MPFR", "MPC", "GCC", "LIBC"}
+for i,k in ipairs(order) do
+    if env[k .. "_OVERRIDE"] then --ignore what we have, replace it.
+        dependencies[k] = env[k .. "_OVERRIDE"]
+    else
+        if env[k .. "_VERSION"] then --add a specific version tag (looks up version by git/hg/subversion tag)
+            dependencies[k].version = env[k .. "_VERSION"]
+        end
+    end
+end
+
+for i,k in ipairs(order) do
+    print("Building "..k.."...")
+    local v = dependencies[k]
+    v.target = target
+    v.output = os.getenv("CROSS_ROOT").."/bin/"..target
+
+    local dir = nil --dir to try and build in
+    if v.method then --get the code
+        dir = source_control(v.method, v.url, v)
+    else
+        if type(v)=="function" then dir = v() end
+    end
+    
+    if not dir then return 1 end --something didn't return right
+    
+    local cmd = "cd "..dir.."; "..v.builder:context(v)
+    print("Running: ", cmd)
+    local doer = io.popen(cmd)
+    for l in doer:lines() do
+        print(l)
+    end
+end
+
+print("Re-building gcc for target...")
+--Then do gcc again...
+dependencies.GCC = {
+        method = "svn",
+        url = "svn://gcc.gnu.org/svn/gcc/trunk",
+        builder = "make distclean; ./configure --target={{target}} --prefix={{output}} --with-newlib --with-gnu-as --with-gnu-ld --disable-shared --disable-libssp; make all; make install;"
+    }
+local dir = source_control(dependencies.GCC.method, dependencies.GCC.url, dependencies.GCC)
+local cmd = "cd "..dir.."; "..dependencies.GCC.builder:context(dependencies.GCC)
+local doer = io.popen(cmd)
+for l in doer:lines() do
+    print(l)
+end
+
+
+return 0
