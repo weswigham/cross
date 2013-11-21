@@ -2,11 +2,13 @@
 
 string.context = function(str, context)
     local ret = str
-    for c in str:gmatch("{{.-}}") do
-        if context[c:gsub("[{}]","")] then
-            ret = ret:gsub(c, context[c:gsub("[{}]","")])
-        else
-            ret = ret:gsub(c, "")
+    while ret:match("{{.-}}") do --allows for contexts that replace with other contexts. This can now go infinite. 
+        for c in ret:gmatch("{{.-}}") do
+            if context[c:gsub("[{}]","")] then
+                ret = ret:gsub(c, context[c:gsub("[{}]","")])
+            else
+                ret = ret:gsub(c, "")
+            end
         end
     end
     return ret
@@ -92,41 +94,54 @@ if not found then
 end
 
 local dependencies = {
+    --Build requirements
+    BISON = {
+        method = "git",
+        url = "git://git.savannah.gnu.org/bison.git",
+        builder = "./bootstrap; ./configure; make; sudo make install;"
+    },
+    FLEX = {
+        method = "git",
+        url = "git://git.code.sf.net/p/flex/flex",
+        builder = "./autogen.sh; ./configure; make; sudo make install;"
+    },
+    
+    --Cross build requirements
     BINUTILS = {
         method = "git",
         url = "git://sourceware.org/git/binutils-gdb.git",
-        builder = "./configure --target={{target}} --prefix={{output}}; make all; make install;"
+        builder = "rm ./config.cache; make distclean; ./configure --target={{target}} --prefix={{output}}; make all; make configure-host; make install;"
     },
     LIBICONV = {
         method = "git",
         url = "git://git.savannah.gnu.org/libiconv.git",
-        builder = "cd ../; mv libiconv gcc/libiconv"
+        builder = "cd ../; cp -fRsu libiconv/* gcc/libiconv" 
     },
     GMP = {
         method = "hg",
         url = "http://hg.gmplib.org:8000/gmp-5.1",
-        builder = "cd ../; mv gmp gcc/gmp"
+        builder = "cd ../; cp -fRsu gmp-5/* gcc/gmp"
     },
     MPFR = {
         method = "svn",
-        url = "svn://scm.gforge.inria.fr/svn/mpfr/branches/3.1",
-        builder = "cd ../; mv mpfr gcc/mpfr"
+        url = "svn://scm.gforge.inria.fr/svn/mpfr/trunk",
+        builder = "cd ../; cp -fRsu mpfr/* gcc/mpfr"
     },
     MPC = {
         method = "svn",
         url = "svn://scm.gforge.inria.fr/svnroot/mpc/trunk",
-        builder = "cd ../; mv mpc gcc/mpc"
+        builder = "cd ../; cp -fRsu mpc/* gcc/mpc"
     },
     GCC = {
         method = "svn",
         url = "svn://gcc.gnu.org/svn/gcc/trunk",
-        builder = "make distclean; ./configure --target={{target}} --prefix={{output}} --without-headers \
-        --with-newlib --with-gnu-as --with-gnu-ld; make all; make install;"
+        builder = "rm ./config.cache; make distclean; ./configure --target={{target}} --prefix={{output}} --without-headers \
+        --with-newlib --with-gnu-as --with-gnu-ld; make all-gcc; make install-gcc"
     },
-    LIBC = { --use newlib by default because, well, anything else is hard
+    LIBC = { --use newlib by default because, well, anything else (ie, system headers) is hard
         method = "git",
         url = "git://sourceware.org/git/newlib.git",
-        builder = "./configure --target={{target}} --prefix={{output}}; make all; make install;"     
+        builder = "./configure --target={{target}} --prefix={{output}}; make; make install;"     
     }
 }
 
@@ -134,7 +149,7 @@ local s = "return { " .. found:read("*a") .. " }"
 found:close()
 local env = assert(loadstring(s))()
 
-local order = {"BINUTILS", "LIBICONV", "GMP", "MPFR", "MPC", "GCC", "LIBC"}
+local order = {"FLEX", "BISON", "BINUTILS", "LIBICONV", "GMP", "MPFR", "MPC", "GCC", "LIBC"}
 for i,k in ipairs(order) do
     if env[k .. "_OVERRIDE"] then --ignore what we have, replace it.
         dependencies[k] = env[k .. "_OVERRIDE"]
@@ -146,7 +161,7 @@ for i,k in ipairs(order) do
 end
 
 for i,k in ipairs(order) do
-    print("Building "..k.."...")
+    print("Downloading "..k.."...")
     local v = dependencies[k]
     v.target = target
     v.output = os.getenv("CROSS_ROOT").."/bin/"..target
@@ -159,6 +174,17 @@ for i,k in ipairs(order) do
     end
     
     if not dir then return 1 end --something didn't return right
+    
+    dependencies[k].dir = dir
+end
+
+for i,k in ipairs(order) do
+    print("Building "..k.."...")
+    local v = dependencies[k]
+    v.target = target
+    v.output = os.getenv("CROSS_ROOT").."/bin/"..target
+
+    local dir = dependencies[k].dir
     
     local cmd = "cd "..dir.."; "..v.builder:context(v)
     print("Running: ", cmd)
@@ -173,7 +199,7 @@ print("Re-building gcc for target...")
 dependencies.GCC = {
         method = "svn",
         url = "svn://gcc.gnu.org/svn/gcc/trunk",
-        builder = "make distclean; ./configure --target={{target}} --prefix={{output}} --with-newlib --with-gnu-as --with-gnu-ld --disable-shared --disable-libssp; make all; make install;"
+        builder = "rm ./config.cache; make distclean; ./configure --target={{target}} --prefix={{output}} --with-newlib --with-gnu-as --with-gnu-ld --disable-shared --disable-libssp; make all-gcc; sudo make install-gcc;"
     }
 local dir = source_control(dependencies.GCC.method, dependencies.GCC.url, dependencies.GCC)
 local cmd = "cd "..dir.."; "..dependencies.GCC.builder:context(dependencies.GCC)
