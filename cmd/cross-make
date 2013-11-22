@@ -64,7 +64,7 @@ setmetatable(source_control, {__call = function(self, method, path, con)
         
         return dir
     else
-        error("Source control method '"..method.."' not supported.")
+        error("Source control method '"..(method or "no method specified").."' not supported.")
     end
 end})
 
@@ -159,7 +159,7 @@ local dependencies = {
         builder = PATH_SHIM .. [[
         mkdir -p ../build-newlib
         cd ../build-newlib
-        ../build-newlib/configure --target={{target}} --prefix="{{output}}"
+        ../newlib/configure --target={{target}} --prefix="{{output}}"
         make all
         make install
         ]]
@@ -217,15 +217,13 @@ end
 
 print("Re-building gcc for target...")
 --Then do gcc again...
-dependencies.GCC = {
-        builder = PATH_SHIM ..[[
+dependencies.GCC.builder = PATH_SHIM ..[[
         mkdir -p ../build-gcc
         cd ../build-gcc
         ../gcc/configure --target={{target}} --prefix="{{output}}"--with-newlib --with-gnu-as --with-gnu-ld --disable-shared --disable-libssp
         make all-gcc
         make install-gcc
         ]]
-    }
 local dir = source_control(dependencies.GCC.method, dependencies.GCC.url, dependencies.GCC)
 local cmd = "cd "..dir.."; "..dependencies.GCC.builder:context(dependencies.GCC)
 local doer = io.popen(cmd)
