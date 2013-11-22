@@ -1,5 +1,7 @@
 #!/usr/bin/lua
 
+local CROSS_ROOT = os.getenv("CROSS_ROOT")
+
 string.context = function(str, context)
     local ret = str
     while ret:match("{{.-}}") do --allows for contexts that replace with other contexts. This can now go infinite. 
@@ -37,7 +39,7 @@ setmetatable(source_control, {__call = function(self, method, path, con)
         local bnc = ("basename {{path}}"):context{path = shortpath}
         local filename = assert(io.popen(bnc)):read()
         local fn = filename:gsub("%..*$", "")
-        local dir = os.getenv("CROSS_ROOT").."/sources/"..fn
+        local dir = CROSS_ROOT.."/sources/"..fn
         local okay = io.popen("mkdir "..dir.." 2>&1")
         local runstr = method.." "
         if okay and okay:read("*all"):match("mkdir:") then --dir existed
@@ -75,10 +77,10 @@ end
 
 local found
 local target
-for file in io.popen("ls ./targets"):lines() do
+for file in io.popen("ls "..CROSS_ROOT.."/cmd/targets"):lines() do
     if file==argt[1] then
         target = file
-        found = io.open("./targets/"..file)
+        found = io.open(CROSS_ROOT.."/cmd/targets/"..file)
         break
     end
 end
@@ -86,12 +88,14 @@ end
 if not found then
     print("Target not found. Available targets:")
     local prefix = "  "
-    for file in io.popen("ls ./targets"):lines() do
+    for file in io.popen("ls "..CROSS_ROOT.."/cmd/targets"):lines() do
         print(prefix..file)
     end
     
     return 1
 end
+
+local PATH_SHIM = "PATH=\""..CROSS_ROOT.."/bin/"..target.."/bin:$PATH\";"
 
 local dependencies = {
     --Build requirements
@@ -110,38 +114,55 @@ local dependencies = {
     BINUTILS = {
         method = "git",
         url = "git://sourceware.org/git/binutils-gdb.git",
-        builder = "rm ./config.cache; make distclean; ./configure --target={{target}} --prefix={{output}}; make all; make configure-host; make install;"
-    },
-    LIBICONV = {
+        builder = [[mkdir -p ../build-binutils
+        cd ../build-binutils
+        ../binutils-gdb/configure --target={{target}} --prefix="{{output}}" 
+        make all
+        make install
+        ]]
+    }, --[[
+    LIBICONV = { --GCC prereqs library
         method = "git",
         url = "git://git.savannah.gnu.org/libiconv.git",
-        builder = "cd ../; cp -fRsu libiconv/* gcc/libiconv" 
+        builder = "cd ../; mkdir -p gcc/libiconv; cp -fRu libiconv/* gcc/libiconv" 
     },
     GMP = {
         method = "hg",
         url = "http://hg.gmplib.org:8000/gmp-5.1",
-        builder = "cd ../; cp -fRsu gmp-5/* gcc/gmp"
+        builder = "cd ../; mkdir -p gcc/gmp; cp -fRu gmp-5/* gcc/gmp"
     },
     MPFR = {
         method = "svn",
         url = "svn://scm.gforge.inria.fr/svn/mpfr/trunk",
-        builder = "cd ../; cp -fRsu mpfr/* gcc/mpfr"
+        builder = "cd ../; mkdir -p gcc/mpfr; cp -fRu mpfr/* gcc/mpfr"
     },
     MPC = {
         method = "svn",
         url = "svn://scm.gforge.inria.fr/svnroot/mpc/trunk",
-        builder = "cd ../; cp -fRsu mpc/* gcc/mpc"
-    },
+        builder = "cd ../; mkdir -p gcc/mpc; cp -fRu mpc/* gcc/mpc"
+    },]]
     GCC = {
-        method = "svn",
-        url = "svn://gcc.gnu.org/svn/gcc/trunk",
-        builder = "rm ./config.cache; make distclean; ./configure --target={{target}} --prefix={{output}} --without-headers \
-        --with-newlib --with-gnu-as --with-gnu-ld; make all-gcc; make install-gcc"
+        method = "git",
+        url = "git://gcc.gnu.org/git/gcc.git",
+        builder = PATH_SHIM .. [[
+        ./contrib/download_prerequisites
+        mkdir -p ../build-gcc
+        cd ../build-gcc
+        ../gcc/configure --target={{target}} --prefix="{{output}}"  --without-headers --with-newlib --with-gnu-as --with-gnu-ld
+        make all-gcc
+        make install-gcc
+        ]]
     },
     LIBC = { --use newlib by default because, well, anything else (ie, system headers) is hard
         method = "git",
         url = "git://sourceware.org/git/newlib.git",
-        builder = "./configure --target={{target}} --prefix={{output}}; make; make install;"     
+        builder = PATH_SHIM .. [[
+        mkdir -p ../build-newlib
+        cd ../build-newlib
+        ../build-newlib/configure --target={{target}} --prefix="{{output}}"
+        make all
+        make install
+        ]]
     }
 }
 
@@ -149,7 +170,7 @@ local s = "return { " .. found:read("*a") .. " }"
 found:close()
 local env = assert(loadstring(s))()
 
-local order = {"FLEX", "BISON", "BINUTILS", "LIBICONV", "GMP", "MPFR", "MPC", "GCC", "LIBC"}
+local order = {"FLEX", "BISON", "BINUTILS", --[["LIBICONV", "GMP", "MPFR", "MPC",]] "GCC", "LIBC"}
 for i,k in ipairs(order) do
     if env[k .. "_OVERRIDE"] then --ignore what we have, replace it.
         dependencies[k] = env[k .. "_OVERRIDE"]
@@ -164,7 +185,7 @@ for i,k in ipairs(order) do
     print("Downloading "..k.."...")
     local v = dependencies[k]
     v.target = target
-    v.output = os.getenv("CROSS_ROOT").."/bin/"..target
+    v.output = CROSS_ROOT.."/bin/"..target
 
     local dir = nil --dir to try and build in
     if v.method then --get the code
@@ -182,7 +203,7 @@ for i,k in ipairs(order) do
     print("Building "..k.."...")
     local v = dependencies[k]
     v.target = target
-    v.output = os.getenv("CROSS_ROOT").."/bin/"..target
+    v.output = CROSS_ROOT.."/bin/"..target
 
     local dir = dependencies[k].dir
     
@@ -197,9 +218,13 @@ end
 print("Re-building gcc for target...")
 --Then do gcc again...
 dependencies.GCC = {
-        method = "svn",
-        url = "svn://gcc.gnu.org/svn/gcc/trunk",
-        builder = "rm ./config.cache; make distclean; ./configure --target={{target}} --prefix={{output}} --with-newlib --with-gnu-as --with-gnu-ld --disable-shared --disable-libssp; make all-gcc; sudo make install-gcc;"
+        builder = PATH_SHIM ..[[
+        mkdir -p ../build-gcc
+        cd ../build-gcc
+        ../gcc/configure --target={{target}} --prefix="{{output}}"--with-newlib --with-gnu-as --with-gnu-ld --disable-shared --disable-libssp
+        make all-gcc
+        make install-gcc
+        ]]
     }
 local dir = source_control(dependencies.GCC.method, dependencies.GCC.url, dependencies.GCC)
 local cmd = "cd "..dir.."; "..dependencies.GCC.builder:context(dependencies.GCC)
