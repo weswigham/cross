@@ -262,7 +262,7 @@ else
     for m in paths:gmatch(".-/.cross/.-:") do
         paths = paths:gsub(m,"")
     end
-    local res = io.popen('PATH="'..paths..'"; {{executable}}'..argstr):read("*a")
+    local res = io.popen('PATH="'..paths..'"; {{executable}}'..argstr)
     if not res then return print("No system version present.") end
     for l in res:lines() do
         print(l)
