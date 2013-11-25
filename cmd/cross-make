@@ -250,8 +250,47 @@ for l in doer:lines() do
 end
 
 --symlink all executables made into bin
-for lin in io.popen("ls "..CROSS_ROOT.."/bin/*/bin"):read("*a"):lines() do
-    print(io.popen("ln -s "..CROSS_ROOT.."/bin/*/bin/"..lin.." "..CROSS_ROOT.."/bin/"..lin):read("*a"))
+for lin in io.popen("ls "..CROSS_ROOT.."/bin/*/bin"):lines() do
+    io.popen("ln -s "..CROSS_ROOT.."/bin/*/bin/"..lin.." "..CROSS_ROOT.."/bin/"..lin):read("*a")
+end
+
+local shim_base = [[
+#!/usr/bin/lua
+
+local CROSS_ROOT = os.getenv("CROSS_ROOT")
+
+local cwd = io.popen("echo '$PWD'"):read("*a")
+local tar = cwd.."/.cross_target"
+local tarfile = io.open(tar, "r")
+local args = {...}
+local argstr = ""
+for k,v in ipairs(args) do
+    argstr = argstr.." "..v
+end
+if tarfile then
+    local target = tarfile:read("*a")
+    return io.popen(CROSS_ROOT.."/bin/"..target.."%-{{executable}}"..argstr):read("*a")
+else
+    local paths = os.getenv("PATH") --remove cross paths from path
+    for m in paths:match(":.-/.cross/.-:") do
+        paths:gsub(m,":")
+    end
+    return io.popen('PATH="'..paths..'"; {{executable}}'..argstr):read("*a")
+end
+]]
+
+local executables = {}
+for lin in io.popen("ls "..CROSS_ROOT.."/bin"):lines() do
+    table.insert(executables, lin:match("%-(.-)$"))
+end
+for i,p in ipairs(executables) do
+    local filename = CROSS_ROOT.."/shims/"..p
+    local shim = io.open(filename, "w")
+    local shimtext = shim_base:context{executable = p}
+    shim:write(shimtext)
+    shim:flush()
+    shim:close()
+    os.execute("chmod +x "..filename)
 end
 
 
