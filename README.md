@@ -26,20 +26,20 @@ Using cross
 -----------
 Cross comes bundled with a few useful commands.
 
-~make~
+_make_
 ```
 cross make TARGET [BUILD_PARAMS ...]
 ```
 'TARGET' is your standard target triple, such as 'x86_64-pc-mingw32'
 'BUILD_PARAMS' are parameters in the form KEY=VALUE which override any other configuration options. More on those later.
 
-~version~
+_version_
 ```
 cross version
 ```
 Outputs the `cross` version number.
 
-~help~
+_help_
 ```
 cross help [subcommand]
 ```
@@ -57,9 +57,11 @@ as a lua table and searched for override parameters. Parameters it looks for inc
 
 >SKIP_BISON or SKIP_FLEX
 >>These, if present, make the build system skip building both flex and bison (prerequisites for building GCC)
+
 >t_VERSION
 >>Where 't' is any of FLEX, BISON, BINUTILS, GCC, or LIBC 
 >>This, by default, indicates a specific version of that dependency is necessary. `cross` will try to checkout the given version from the repo (with hg/git/svn tags).
+
 >t_OVERRIDE 
 >>Where 't' is any of FLEX, BISON, BINUTILS, GCC, or LIBC 
 >>This lets you specify a table to completely override that stage of the build.
