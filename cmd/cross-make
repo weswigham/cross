@@ -76,34 +76,27 @@ if #argt< 1 then
     print([[
     You must supply a target to cross make; ie:
         cross make [target triple] [ENV_FLAG=value]
-        OR
-        cross make --target=[target-triple] [ENV_FLAG=value]
     The first form looks to use a target configuration for that specific target,
     The second form will run with default configurations. (HEAD binutils, HEAD gcc, newlib)
     ]])
     return 1
-else
-    target = argt[1]:match("--target=(.+)")
 end
 
-if not target then
-    for file in io.popen("ls "..CROSS_ROOT.."/cmd/targets"):lines() do
-        if file==argt[1] then
-            target = file
-            found = io.open(CROSS_ROOT.."/cmd/targets/"..file)
-            break
-        end
+local target = argt[1]
+for file in io.popen("ls "..CROSS_ROOT.."/cmd/targets"):lines() do
+    if file==argt[1] then
+        target = file
+        found = io.open(CROSS_ROOT.."/cmd/targets/"..file)
+        break
     end
+end
 
 
-    if not found then
-        print("Target not found. Available targets:")
-        local prefix = "  "
-        for file in io.popen("ls "..CROSS_ROOT.."/cmd/targets"):lines() do
-            print(prefix..file)
-        end
-        
-        return 1
+if not found then
+    print("Target configuration not found. Using defaults. Available targets:")
+    local prefix = "  "
+    for file in io.popen("ls "..CROSS_ROOT.."/cmd/targets"):lines() do
+        print(prefix..file)
     end
 end
 
@@ -251,16 +244,16 @@ end
 
 --symlink all executables made into bin
 for lin in io.popen("ls "..CROSS_ROOT.."/bin/*/bin"):lines() do
-    io.popen("ln -s "..CROSS_ROOT.."/bin/*/bin/"..lin.." "..CROSS_ROOT.."/bin/"..lin):read("*a")
+    io.popen("ln -s -f "..CROSS_ROOT.."/bin/*/bin/"..lin.." "..CROSS_ROOT.."/bin/"..lin):read("*a")
 end
 
 local shim_base = [[
 #!/usr/bin/lua
 
-local CROSS_ROOT = os.getenv("CROSS_ROOT")
+local paths = os.getenv("PATH")
+local CROSS_ROOT =  paths:match("(:.-/.cross/cmd:)"):gsub("/cmd:",""):gsub(":.*:", "")
 
-local cwd = io.popen("echo '$PWD'"):read("*a")
-local tar = cwd.."/.cross_target"
+local tar = "./.cross_target"
 local tarfile = io.open(tar, "r")
 local args = {...}
 local argstr = ""
@@ -268,24 +261,33 @@ for k,v in ipairs(args) do
     argstr = argstr.." "..v
 end
 if tarfile then
-    local target = tarfile:read("*a")
-    return io.popen(CROSS_ROOT.."/bin/"..target.."%-{{executable}}"..argstr):read("*a")
-else
-    local paths = os.getenv("PATH") --remove cross paths from path
-    for m in paths:match(":.-/.cross/.-:") do
-        paths:gsub(m,":")
+    local target = tarfile:read("*a"):gsub("[^a-zA-Z0-9_%-]","")
+    local res = io.popen(CROSS_ROOT.."/bin/"..target.."-{{executable}}"..argstr)
+    for l in res:lines()
+        print(l)
     end
-    return io.popen('PATH="'..paths..'"; {{executable}}'..argstr):read("*a")
+else
+    for m in paths:gmatch(".-/.cross/.-:") do
+        paths = paths:gsub(m,"")
+    end
+    local res = io.popen('PATH="'..paths..'"; {{executable}}'..argstr):read("*a")
+    for l in res:lines()
+        print(l)
+    end
 end
 ]]
 
 local executables = {}
 for lin in io.popen("ls "..CROSS_ROOT.."/bin"):lines() do
-    table.insert(executables, lin:match("%-(.-)$"))
+    table.insert(executables, lin:match(".-%-.-%-.-%-(.-)$"))
 end
 for i,p in ipairs(executables) do
     local filename = CROSS_ROOT.."/shims/"..p
-    local shim = io.open(filename, "w")
+    os.execute("rm -rf "..CROSS_ROOT.."/shims")
+    os.execute("mkdir -p "..CROSS_ROOT.."/shims")
+    os.execute("touch "..filename)
+    local shim, err = io.open(filename, "w+")
+    if not shim then print(filename, err) return 1 end
     local shimtext = shim_base:context{executable = p}
     shim:write(shimtext)
     shim:flush()
