@@ -155,6 +155,20 @@ local dependencies = {
         make install
         ]]
     }
+    GCC_2 = {
+        method = dependencies.GCC.method,
+        url = dependencies.GCC.url,
+        builder = PATH_SHIM .. [[
+        git reset HEAD --hard
+        mkdir -p ../build-gcc
+        cd ../build-gcc
+        make distclean;
+        rm -rf ./config.cache;
+        ../gcc/configure --target={{target}} --prefix="{{output}}" --with-newlib --with-gnu-as --with-gnu-ld --disable-shared --disable-libssp
+        make all-gcc
+        make install-gcc
+        ]]
+    }
 }
 
 
@@ -174,7 +188,7 @@ for k,v in ipairs(argt) do
 end
 
 
-local order = {"FLEX", "BISON", "BINUTILS", "GCC", "LIBC"}
+local order = {"FLEX", "BISON", "BINUTILS", "GCC", "LIBC", "GCC_2"}
 for i,k in ipairs(order) do
     if env[k .. "_OVERRIDE"] then --ignore what we have, replace it.
         dependencies[k] = env[k .. "_OVERRIDE"]
@@ -224,24 +238,6 @@ for i,k in ipairs(order) do
     end
 end
 
-print("Re-building gcc for target...")
---Then do gcc again...
-dependencies.GCC.builder = PATH_SHIM ..[[
-        mkdir -p ../build-gcc
-        cd ../build-gcc
-        make distclean;
-        rm -rf ./config.cache;
-        ../gcc/configure --target={{target}} --prefix="{{output}}" --with-newlib --with-gnu-as --with-gnu-ld --disable-shared --disable-libssp
-        make all-gcc
-        make install-gcc
-        ]]
-local dir = source_control(dependencies.GCC.method, dependencies.GCC.url, dependencies.GCC)
-local cmd = "cd "..dir.."; "..dependencies.GCC.builder:context(dependencies.GCC)
-local doer = io.popen(cmd)
-for l in doer:lines() do
-    print(l)
-end
-
 --symlink all executables made into bin
 for lin in io.popen("ls "..CROSS_ROOT.."/bin/*/bin"):lines() do
     io.popen("ln -s -f "..CROSS_ROOT.."/bin/*/bin/"..lin.." "..CROSS_ROOT.."/bin/"..lin):read("*a")
@@ -263,7 +259,8 @@ end
 if tarfile then
     local target = tarfile:read("*a"):gsub("[^a-zA-Z0-9_%-]","")
     local res = io.popen(CROSS_ROOT.."/bin/"..target.."-{{executable}}"..argstr)
-    for l in res:lines()
+    if not res then return print("Target '"..target.."' not installed.") end
+    for l in res:lines() do
         print(l)
     end
 else
@@ -271,7 +268,8 @@ else
         paths = paths:gsub(m,"")
     end
     local res = io.popen('PATH="'..paths..'"; {{executable}}'..argstr):read("*a")
-    for l in res:lines()
+    if not res then return print("No system version present.") end
+    for l in res:lines() do
         print(l)
     end
 end
