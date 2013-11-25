@@ -62,14 +62,14 @@ For quite a few targets these defaults work pretty okay, but if they don't, `cro
 `cross` looks in its _cmd/targets_ directory for files named after the target given. If it exists, the file is loaded
 as a lua table and searched for override parameters. Parameters it looks for include:
 
->_SKIP_BISON_ or _SKIP_FLEX_
+>SKIP_BISON or SKIP_FLEX
 >>These, if present, make the build system skip building both flex and bison (prerequisites for building GCC)
 
->_t_VERSION_
+>t_VERSION
 >>Where 't' is any of FLEX, BISON, BINUTILS, GCC, or LIBC 
 >>This, by default, indicates a specific version of that dependency is necessary. `cross` will try to checkout the given version from the repo (with hg/git/svn tags).
 
->_t_OVERRIDE_ 
+>t_OVERRIDE 
 >>Where 't' is any of FLEX, BISON, BINUTILS, GCC, or LIBC 
 >>This lets you specify a table to completely override that stage of the build.
 >>The table has the fields 'target' and 'output' set to its output dir and target-triple,
