@@ -279,10 +279,10 @@ local executables = {}
 for lin in io.popen("ls "..CROSS_ROOT.."/bin"):lines() do
     table.insert(executables, lin:match(".-%-.-%-.-%-(.-)$"))
 end
+os.execute("rm -rf "..CROSS_ROOT.."/shims")
+os.execute("mkdir -p "..CROSS_ROOT.."/shims")
 for i,p in ipairs(executables) do
     local filename = CROSS_ROOT.."/shims/"..p
-    os.execute("rm -rf "..CROSS_ROOT.."/shims")
-    os.execute("mkdir -p "..CROSS_ROOT.."/shims")
     os.execute("touch "..filename)
     local shim, err = io.open(filename, "w+")
     if not shim then print(filename, err) return 1 end
