@@ -30,7 +30,8 @@ _make_
 ```
 cross make TARGET [BUILD_PARAMS ...]
 ```
-'TARGET' is your standard target triple, such as 'x86_64-pc-mingw32'
+'TARGET' is your standard target triple, such as 'x86_64-pc-mingw32'.
+
 'BUILD_PARAMS' are parameters in the form KEY=VALUE which override any other configuration options. More on those later.
 
 _version_
