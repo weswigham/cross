@@ -22,6 +22,12 @@ echo 'export PATH="$HOME/.cross/shims:$HOME/.cross/bin:$HOME/.cross/cmd:$PATH"' 
 
 And then restart your shell.
 
+Dependencies
+------------
+`cross` itself depends on `lua` and a shell environment. It also makes use of `git`, `svn`, and potentially `hg` for version control.
+
+GCC depends on a large number of things, including `autoconf`, `automake`, `autopoint`, `gettext`, and `texinfo` to build, and possibly more. You can find out either by interpreting GCC's errors when you attempt to compile, or by looking them up at http://gcc.gnu.org/install/prerequisites.html.
+
 Using cross
 -----------
 Cross comes bundled with a few useful commands.
@@ -53,17 +59,17 @@ GCC is built first without headers, then newlib is built with it as the C-librar
 with newlib as the included C library.
 
 For quite a few targets these defaults work pretty okay, but if they don't, `cross` is highly configurable. 
-`cross` looks in its `cmd/targets` directory for files named after the target given. If it exists, the file is loaded
+`cross` looks in its _cmd/targets_ directory for files named after the target given. If it exists, the file is loaded
 as a lua table and searched for override parameters. Parameters it looks for include:
 
->SKIP_BISON or SKIP_FLEX
+>_SKIP_BISON_ or _SKIP_FLEX_
 >>These, if present, make the build system skip building both flex and bison (prerequisites for building GCC)
 
->t_VERSION
+>_t_VERSION_
 >>Where 't' is any of FLEX, BISON, BINUTILS, GCC, or LIBC 
 >>This, by default, indicates a specific version of that dependency is necessary. `cross` will try to checkout the given version from the repo (with hg/git/svn tags).
 
->t_OVERRIDE 
+>_t_OVERRIDE_ 
 >>Where 't' is any of FLEX, BISON, BINUTILS, GCC, or LIBC 
 >>This lets you specify a table to completely override that stage of the build.
 >>The table has the fields 'target' and 'output' set to its output dir and target-triple,

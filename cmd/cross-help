@@ -1,6 +1,3 @@
-#!/usr/bin/env bash
+#!/usr/bin/lua
 
-for pathname in "$CROSS_ROOT/cmd/*"; do
-  ### filename=$(basename $pathname)
-  echo "Nope."
-done;
+print("For help, refer to the README.md for now.")
