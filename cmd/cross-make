@@ -154,10 +154,10 @@ local dependencies = {
         make all
         make install
         ]]
-    }
+    },
     GCC_2 = {
-        method = dependencies.GCC.method,
-        url = dependencies.GCC.url,
+        method = "git",
+        url = "git://gcc.gnu.org/git/gcc.git",
         builder = PATH_SHIM .. [[
         git reset HEAD --hard
         mkdir -p ../build-gcc
