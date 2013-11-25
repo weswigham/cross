@@ -146,13 +146,8 @@ local dependencies = {
         method = "git",
         url = "git://sourceware.org/git/newlib.git",
         builder = PATH_SHIM .. [[
-        mkdir -p ../build-newlib
-        cd ../build-newlib
-        make distclean;
-        rm -rf ./config.cache;
-        ../newlib/configure --target={{target}} --prefix="{{output}}"
-        make all
-        make install
+        cp -fru ./newlib ../gcc
+        cp -fru ./libgloss ../gcc
         ]]
     },
     GCC_2 = {
