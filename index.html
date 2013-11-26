@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <link href='https://fonts.googleapis.com/css?family=Chivo:900' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <title>Cross by weswigham</title>
+  </head>
+
+  <body>
+    <div id="container">
+      <div class="inner">
+
+        <header>
+          <h1>Cross</h1>
+          <h2>Cross-compiler environment management</h2>
+        </header>
+
+        <section id="downloads" class="clearfix">
+          <a href="https://github.com/weswigham/cross/zipball/master" id="download-zip" class="button"><span>Download .zip</span></a>
+          <a href="https://github.com/weswigham/cross/tarball/master" id="download-tar-gz" class="button"><span>Download .tar.gz</span></a>
+          <a href="https://github.com/weswigham/cross" id="view-on-github" class="button"><span>View on GitHub</span></a>
+        </section>
+
+        <hr>
+
+        <section id="main_content">
+          <h1>
+<a name="cross" class="anchor" href="#cross"><span class="octicon octicon-link"></span></a>cross</h1>
+
+<p>cross is a cross-compiler builder and manager. With cross, generating a 
+cross compiler for a new architecture is as simple as</p>
+
+<pre><code>cross make arm-none-eabi
+</code></pre>
+
+<h2>
+<a name="installing-cross" class="anchor" href="#installing-cross"><span class="octicon octicon-link"></span></a>Installing <code>cross</code>
+</h2>
+
+<p>Download <code>cross</code>:</p>
+
+<pre><code>git clone https://github.com/weswigham/cross.git ~/.cross
+</code></pre>
+
+<p>Then add the cross bin and shims to the end of your bash/zsh/other profile:</p>
+
+<pre><code>echo 'export PATH="$HOME/.cross/shims:$HOME/.cross/bin:$HOME/.cross/cmd:$PATH"' &gt;&gt; ~/.bash_profile
+</code></pre>
+
+<p>And then restart your shell.</p>
+
+<h2>
+<a name="dependencies" class="anchor" href="#dependencies"><span class="octicon octicon-link"></span></a>Dependencies</h2>
+
+<p><code>cross</code> itself depends on <code>lua</code> and a shell environment. It also makes use of <code>git</code>, <code>svn</code>, and potentially <code>hg</code> for version control.</p>
+
+<p>GCC depends on a large number of things, including <code>autoconf</code>, <code>automake</code>, <code>autopoint</code>, <code>gettext</code>, and <code>texinfo</code> to build, and possibly more. You can find out either by interpreting GCC's errors when you attempt to compile, or by looking them up at <a href="http://gcc.gnu.org/install/prerequisites.html">http://gcc.gnu.org/install/prerequisites.html</a>.</p>
+
+<h2>
+<a name="using-cross" class="anchor" href="#using-cross"><span class="octicon octicon-link"></span></a>Using <code>cross</code>
+</h2>
+
+<p>Installing a new cross compiler</p>
+
+<pre><code>cross make arm-none-eabi
+</code></pre>
+
+<p>Which will download, compile, and install <code>arm-none-eabi</code> platform tools, so you can</p>
+
+<pre><code>arm-none-eabi-gcc hello.c -o hello
+</code></pre>
+
+<h2>
+<a name="cross-subcommands" class="anchor" href="#cross-subcommands"><span class="octicon octicon-link"></span></a><code>cross</code> subcommands</h2>
+
+<p><code>cross</code> comes bundled with a few useful commands.</p>
+
+<p><em>make</em></p>
+
+<pre><code>cross make TARGET [BUILD_PARAMS ...]
+</code></pre>
+
+<p>'TARGET' is your standard target triple, such as 'x86_64-pc-mingw32'.</p>
+
+<p>'BUILD_PARAMS' are parameters in the form KEY=VALUE which override any other configuration options. More on those later.</p>
+
+<p><em>version</em></p>
+
+<pre><code>cross version
+</code></pre>
+
+<p>Outputs the <code>cross</code> version number.</p>
+
+<p><em>help</em></p>
+
+<pre><code>cross help [subcommand]
+</code></pre>
+
+<p>Outputs either the list of subcommands or the help text for a specific subcommand.</p>
+
+<h2>
+<a name="target-configurations" class="anchor" href="#target-configurations"><span class="octicon octicon-link"></span></a>Target Configurations</h2>
+
+<p>Cross comes bundled with what could be considered 'sane defaults' for <em>embedded systems</em>-type target architectures. The head version of 
+GCC is built first without headers, then newlib is built with that GCC, then GCC is rebuilt again 
+with newlib as the included C library.</p>
+
+<p>For quite a few targets these defaults work pretty okay, but if they don't, <code>cross</code> is highly configurable. 
+<code>cross</code> looks in its <em>cmd/targets</em> directory for files named after the target given. If it exists, the file is loaded
+as a lua table and searched for override parameters. Parameters it looks for include:</p>
+
+<h3>
+<a name="skip_bison-or-skip_flex" class="anchor" href="#skip_bison-or-skip_flex"><span class="octicon octicon-link"></span></a><code>SKIP_BISON</code> or <code>SKIP_FLEX</code>
+</h3>
+
+<p>These, if present, make the build system skip building both flex and bison (prerequisites for building GCC)</p>
+
+<h3>
+<a name="t_version" class="anchor" href="#t_version"><span class="octicon octicon-link"></span></a><code>t_VERSION</code>
+</h3>
+
+<p>Where 't' is any of FLEX, BISON, BINUTILS, GCC, GCC_2, or LIBC 
+This, by default, indicates a specific version of that dependency is necessary. <code>cross</code> will try to checkout the given version from the repo (with hg/git/svn tags).</p>
+
+<h3>
+<a name="t_override" class="anchor" href="#t_override"><span class="octicon octicon-link"></span></a><code>t_OVERRIDE</code>
+</h3>
+
+<p>Where 't' is any of FLEX, BISON, BINUTILS, GCC, GCC_2, or LIBC 
+This lets you specify a table to completely override that stage of the build.
+The table has the fields 'target' and 'output' set to its output dir and target-triple,
+Then, if the table specifies a 'method' (and, implicitly, a 'url') field, then
+the <code>cross</code> internal source control function is used to download that version.
+If <code>method</code> is not specified, <code>cross</code> expects the table to be callable, and return the directory that dependency's source is in when called. 
+<code>cross</code> also expects the override table to have a 'builder' string. This string has the override table applied to it as a handlebars-esque context
+and then is run from the shell from within the directory the source is in. This is usually something as simple as</p>
+
+<pre><code>./configure; make; make install;
+</code></pre>
+
+<p>Any combination of these can be present in the table, and they can be overridden again with parameters to the <code>make</code> subcommand.</p>
+
+<p>As an example, you can force <code>cross</code> to build GCC 4.8.0 on <code>arm-none-eabi</code> by making the file <code>~/.cross/cmd/targets/arm-none-eabi</code>:</p>
+
+<pre><code>GCC_2_VERSION = "gcc-4_8_0-release", --for the final compilation
+GCC_VERSION = "gcc-4_8_0-release", --since it's probably a good idea to build the same version when we bootstrap
+</code></pre>
+
+<h2>
+<a name="how-cross-works" class="anchor" href="#how-cross-works"><span class="octicon octicon-link"></span></a>How cross works</h2>
+
+<p>cross is based off of <code>rbenv</code>. As such, there are a number of similarities. Namely, shims. Unlike rbenv, you should never need 
+to <code>rehash</code> yourself, just leave it to cross. </p>
+
+<p>Why does <code>cross</code> have shims? To enable a feature called a 'target override'. 
+If you want to <code>make</code> something for a new target, usually you'd need to make a new makefile referencing the new target's build executables.
+cross alleviates this need. Instead, place a .cross_target file in the same directory as the makefile and make its contents your desired target.
+i.e.:</p>
+
+<pre><code>echo "arm-none-eabi" &gt;&gt; .cross_target
+</code></pre>
+
+<p>cross's shims will look for this file when you run gcc, g++, or any executable compiled by cross and override it with the target-specific version when this file is present.</p>
+        </section>
+
+        <footer>
+          Cross is maintained by <a href="https://github.com/weswigham">weswigham</a><br>
+          This page was generated by <a href="http://pages.github.com">GitHub Pages</a>. Tactile theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.
+        </footer>
+
+        
+      </div>
+    </div>
+  </body>
+</html>
