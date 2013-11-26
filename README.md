@@ -1,4 +1,4 @@
-cross
+[cross](http://weswigham.github.io/cross/)
 =====
 
 cross is a cross-compiler builder and manager. With cross, generating a 
