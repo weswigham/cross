@@ -48,7 +48,7 @@ setmetatable(source_control, {__call = function(self, method, path, con)
             runstr = runstr .. self[method].new
         end
         if con.version then
-            runstr = runstr .. " 2>&1;" .. self[method].specific
+            runstr = runstr .. " 2>&1;" ..method.." ".. self[method].specific
         end
         con.url = path
         con.rooturl = shortpath
@@ -119,11 +119,11 @@ local dependencies = {
     BINUTILS = {
         method = "git",
         url = "git://sourceware.org/git/binutils-gdb.git",
+        remote = "origin",
+        branch = "master",
         builder = [[mkdir -p ../build-binutils
         cd ../build-binutils
-        make distclean;
-        rm -rf ./config.cache;
-        ../binutils-gdb/configure --target={{target}} --prefix="{{output}}" 
+        ../binutils-gdb/configure --target={{target}} --prefix="{{output}}" --enable-interwork --enable-multilib
         make all
         make install
         ]]
@@ -131,13 +131,16 @@ local dependencies = {
     GCC = {
         method = "git",
         url = "git://gcc.gnu.org/git/gcc.git",
+        remote = "origin",
+        branch = "master",
         builder = PATH_SHIM .. [[
+        git clean -f
         ./contrib/download_prerequisites
         mkdir -p ../build-gcc
         cd ../build-gcc
         make distclean;
         rm -rf ./config.cache;
-        ../gcc/configure --target={{target}} --prefix="{{output}}"  --without-headers --with-newlib --with-gnu-as --with-gnu-ld
+        ../gcc/configure --target={{target}} --prefix={{output}} --with-newlib --with-gnu-as --with-gnu-ld --with-headers=./newlib/libc/include
         make all-gcc
         make install-gcc
         ]]
@@ -145,6 +148,8 @@ local dependencies = {
     LIBC = { --use newlib by default because, well, anything else (ie, system headers) is hard
         method = "git",
         url = "git://sourceware.org/git/newlib.git",
+        remote = "origin",
+        branch = "master",
         builder = PATH_SHIM .. [[
         cp -fru ./newlib ../gcc
         cp -fru ./libgloss ../gcc
@@ -153,15 +158,12 @@ local dependencies = {
     GCC_2 = {
         method = "git",
         url = "git://gcc.gnu.org/git/gcc.git",
+        remote = "origin",
+        branch = "master",
         builder = PATH_SHIM .. [[
-        git reset HEAD --hard
-        mkdir -p ../build-gcc
-        cd ../build-gcc
-        make distclean;
-        rm -rf ./config.cache;
-        ../gcc/configure --target={{target}} --prefix="{{output}}" --with-newlib --with-gnu-as --with-gnu-ld --disable-shared --disable-libssp
-        make all-gcc
-        make install-gcc
+        ../gcc/configure --target={{target}} --prefix={{output}} --with-newlib --with-gnu-as --with-gnu-ld --with-headers=./newlib/libc/include
+        make all
+        make install
         ]]
     }
 }
@@ -206,10 +208,10 @@ for i,k in ipairs(order) do
     v.output = CROSS_ROOT.."/bin/"..target
 
     local dir = nil --dir to try and build in
-    if v.method then --get the code
+    if v.method and type(v.method)=="string" then --get the code
         dir = source_control(v.method, v.url, v)
     else
-        if type(v)=="function" then dir = v() end
+        if type(v.method)=="function" then dir = v:method() end
     end
     
     if not dir then return 1 end --something didn't return right

@@ -1,0 +1,41 @@
+
+--arm-none-eabi only seems to work with some curiously specific options and versions... override EVERYTHING
+--Note: sudo apt-get install libgmp-dev libmpfr-dev libmpc-dev
+--As all 3 are required (GMP, MPC, MPFR), but not managed by this version of the gcc build process!
+LIBC_VERSION = "newlib-1_17_0",
+GCC_OVERRIDE = {
+    method = function() 
+        local res = io.popen([[
+        mkdir -p ]]..os.getenv("CROSS_ROOT")..[[/sources/gcc43
+        cd ]]..os.getenv("CROSS_ROOT")..[[/sources/gcc43
+        wget ftp://ftp.gnu.org/gnu/gcc/gcc-4.3.3/gcc-core-4.3.3.tar.gz
+        wget ftp://ftp.gnu.org/gnu/gcc/gcc-4.3.3/gcc-g++-4.3.3.tar.gz 
+        wget ftp://ftp.gnu.org/gnu/gcc/gcc-4.3.3/gcc-4.3.3.tar.gz
+        tar xzvf gcc-4.3.3.tar.gz
+        tar xzvf gcc-core-4.3.3.tar.gz
+        tar xzvf gcc-g++-4.3.3.tar.gz
+        ]])
+        for l in res:lines() do
+            print(l)
+        end
+        return os.getenv("CROSS_ROOT").."/sources/gcc43/gcc-4.3.3"
+    end,
+    builder = [[
+        mkdir -p ../build-gcc
+        cd ../build-gcc
+        make distclean;
+        rm -rf ./config.cache;
+        ../gcc-4.3.3/configure --target={{target}} --prefix={{output}}  --with-newlib --enable-interwork --enable-multilib --with-gnu-as --with-gnu-ld --enable-languages=c,c++ --with-headers=]]..os.getenv("CROSS_ROOT")..[[/sources/newlib/newlib/libc/include
+        make all-gcc install-gcc
+        ]]
+},
+GCC_2_OVERRIDE = {
+    method = function() 
+        return os.getenv("CROSS_ROOT").."/sources/gcc43/gcc-4.3.3"
+    end,
+    builder = [[
+        ../gcc-4.3.3/configure --target={{target}} --prefix={{output}} --enable-multilib --enable-interwork --enable-languages=c,c++
+        make all install
+        ]]
+},
+BINUTILS_VERSION = "binutils-2_19",
