@@ -59,9 +59,10 @@
         height: 50%;
     }
     
-    header h1 {
-        margin-left: 0px;
-        padding-left: 0px;
+    .main section header h1 {
+        padding: 0; 
+        padding-top: 25%; 
+        padding-bottom: 20px;
     }
     
     
@@ -100,7 +101,21 @@
         </section>
         <section class="page2">
             <div class="page_container">
-                <h1>Section 2 test</h1>
+                <h2>
+                <a name="installing-cross" class="anchor" href="#installing-cross"><span class="octicon octicon-link"></span></a>Installing <code>cross</code>
+                </h2>
+
+                <p>Download <code>cross</code>:</p>
+
+                <pre><code>git clone https://github.com/weswigham/cross.git ~/.cross
+                </code></pre>
+
+                <p>Then add the cross bin and shims to the end of your bash/zsh/other profile:</p>
+
+                <pre><code>echo 'export PATH="$HOME/.cross/shims:$HOME/.cross/bin:$HOME/.cross/cmd:$PATH"' &gt;&gt; ~/.bash_profile
+                </code></pre>
+
+                <p>And then restart your shell.</p>
             </div>
         </section>
    </div>
