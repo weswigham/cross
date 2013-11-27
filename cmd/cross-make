@@ -1,4 +1,4 @@
-#!/usr/bin/lua
+#!/usr/bin/env lua
 
 local CROSS_ROOT = os.getenv("CROSS_ROOT")
 
@@ -241,7 +241,7 @@ for lin in io.popen("ls "..CROSS_ROOT.."/bin/*/bin"):lines() do
 end
 
 local shim_base = [[
-#!/usr/bin/lua
+#!/usr/bin/env lua
 
 local paths = os.getenv("PATH")
 local CROSS_ROOT =  paths:match("(:.-/.cross/cmd:)"):gsub("/cmd:",""):gsub(":.*:", "")
